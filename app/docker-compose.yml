@@ -2,8 +2,8 @@ services:
   backend:
     build: ./audio_backend
     container_name: oracle_ai_audio_backend
-    env_file:
-      - ./.env
+    # env_file:
+    #   - ./.env
     volumes:
       - ~/opc/oracle_ai/audio_app:/app/volume
     ports:
@@ -15,8 +15,8 @@ services:
   frontend:
     build: ./streamlit_app
     container_name: oracle_ai_frontend
-    env_file:
-      - ./.env
+    # env_file:
+    #   - ./.env
     volumes:
       - ~/opc/oracle_ai/streamlit_app:/app/volume
     ports:
