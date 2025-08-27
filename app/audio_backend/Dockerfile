@@ -10,7 +10,7 @@ COPY . /app
 
 RUN mkdir -p /root/.oci
 
-COPY /home/opc/.oci/config /root/.oci/config
-COPY /home/opc/.oci/key.pem /root/.oci/key.pem
+COPY .oci /root/.oci/config
+COPY .oci /root/.oci/key.pem
 
 CMD ["uvicorn", "audio_backend:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -16,7 +16,7 @@ COPY .env /app
 
 RUN mkdir -p /root/.oci
 
-COPY /home/opc/.oci/config /root/.oci/config
-COPY /home/opc/.oci/key.pem /root/.oci/key.pem
+COPY .oci /root/.oci/config
+COPY .oci /root/.oci/key.pem
 
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
