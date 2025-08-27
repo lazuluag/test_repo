@@ -89,10 +89,6 @@ echo "${env}" > /home/opc/oracle-ai-accelerator/app/.env
 chmod 600 /home/opc/oracle-ai-accelerator/app/.env
 chown opc:opc /home/opc/oracle-ai-accelerator/app/.env
 
-echo "${env}" > /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
-chmod 600 /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
-chown opc:opc /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
-
 # Step 12: Run the setup script 
 sudo -u opc -i bash <<'EOF'
 cd /home/opc/oracle-ai-accelerator/setup
@@ -104,7 +100,7 @@ EOF
 sudo -u opc -i bash <<'EOF'
 cd /home/opc/oracle-ai-accelerator/app
 echo "[INFO] Iniciando despliegue de contenedores con Docker Compose en background..."
-docker compose -f /home/opc/oracle-ai-accelerator/setup/linux_containers/docker-compose.yml up --build -d
+docker compose up --build -d
 if [ $? -eq 0 ]; then
     echo "[OK] Docker Compose se ejecutó correctamente."
 else
