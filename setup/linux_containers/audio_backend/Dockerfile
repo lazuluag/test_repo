@@ -6,7 +6,7 @@ COPY audio_backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY audio_backend/services /app
-COPY .env /app
+COPY ./.env /app
 COPY audio_backend/audio_backend.py /app
 
 
