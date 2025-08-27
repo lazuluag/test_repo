@@ -6,12 +6,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py /app
-COPY wallet /app
-COPY utils  /app
-COPY services /app
-COPY pages /app
-COPY my_component /app
-COPY components /app
+COPY wallet /app/wallet
+COPY utils  /app/utils
+COPY services /app/services
+COPY pages /app/pages
+COPY my_component /app/my_component
+COPY components /app/components
 COPY .env /app
 
 
