@@ -276,7 +276,7 @@ def main():
         # Verificar Docker y docker compose
         try:
             subprocess.run(["docker", "--version"], check=True)
-            subprocess.run(["docker compose", "--version"], check=True)
+            subprocess.run(["docker", "compose", "--version"], check=True)
         except subprocess.CalledProcessError:
             print("[ERROR] Docker y docker compose deben estar instalados.")
             sys.exit(1)
