@@ -49,7 +49,7 @@ dnf install -y docker-compose-plugin
 
 
 # Step 8: Clone the project repository
-git clone https://github.com/jganggini/oracle-ai-accelerator.git /home/opc/oracle-ai-accelerator
+git clone https://github.com/lazuluag/test_repo.git /home/opc/oracle-ai-accelerator
 chown -R opc:opc /home/opc/oracle-ai-accelerator
 
 # Step 9: Configure OCI CLI with credentials
