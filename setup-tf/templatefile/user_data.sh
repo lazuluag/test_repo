@@ -17,6 +17,7 @@ systemctl enable firewalld
 # Step 4: Open required ports in the firewall (Streamlit and VNC)
 firewall-cmd --add-port=8501/tcp --permanent
 firewall-cmd --add-port=5901/tcp --permanent
+firewall-cmd --add-port=8000/tcp --permanent
 firewall-cmd --reload
 
 # Step 5: Install Docker Engine
@@ -87,6 +88,10 @@ OCI_CLI_CONFIG_FILE=/home/opc/.oci/config oci os object delete \
 echo "${env}" > /home/opc/oracle-ai-accelerator/app/.env
 chmod 600 /home/opc/oracle-ai-accelerator/app/.env
 chown opc:opc /home/opc/oracle-ai-accelerator/app/.env
+
+echo "${env}" > /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
+chmod 600 /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
+chown opc:opc /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
 
 # Step 12: Run the setup script 
 sudo -u opc -i bash <<'EOF'
