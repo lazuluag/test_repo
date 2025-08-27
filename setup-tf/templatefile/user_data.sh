@@ -89,6 +89,16 @@ echo "${env}" > /home/opc/oracle-ai-accelerator/app/.env
 chmod 600 /home/opc/oracle-ai-accelerator/app/.env
 chown opc:opc /home/opc/oracle-ai-accelerator/app/.env
 
+cp /home/opc/oracle-ai-accelerator/app/.env /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
+cp /home/opc/oracle-ai-accelerator/app/.env /home/opc/oracle-ai-accelerator/app/audio_backend/.env
+
+# Ajustar permisos también en las copias
+chmod 600 /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
+chown opc:opc /home/opc/oracle-ai-accelerator/setup/linux_containers/.env
+
+chmod 600 /home/opc/oracle-ai-accelerator/otra_carpeta/.env
+chown opc:opc /home/opc/oracle-ai-accelerator/app/audio_backend/.env
+
 # Step 12: Run the setup script 
 sudo -u opc -i bash <<'EOF'
 cd /home/opc/oracle-ai-accelerator/setup
