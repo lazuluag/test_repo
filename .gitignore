@@ -1,6 +1,4 @@
 __pycache__
-*/.env
-.env 
 files
 app/data
 node_modules
