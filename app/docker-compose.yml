@@ -13,7 +13,7 @@ services:
     restart: unless-stopped 
 
   frontend:
-    build: ./streamlit_app
+    build: ./
     container_name: oracle_ai_frontend
     env_file:
       - ./.env
