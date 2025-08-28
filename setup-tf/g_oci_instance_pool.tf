@@ -75,67 +75,127 @@ data "template_file" "user_data" {
 }
 
 ############################################
-# Compute Instance
+# Instance Configuration 
 ############################################
+resource "oci_core_instance_configuration" "instance_config" {
+  compartment_id = var.compartment_ocid
+  display_name   = "${var._oci_instance.display_name}-config"
 
-#https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_instance
-resource "oci_core_instance" "linux_instance" {
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  instance_details {
+    instance_type = "compute"
+
+    launch_details {
+      compartment_id      = var.compartment_ocid
+      availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+      shape               = var._oci_instance.shape.name
+
+      shape_config {
+        ocpus         = var._oci_instance.shape.ocpus
+        memory_in_gbs = var._oci_instance.shape.memory_in_gbs
+      }
+
+      source_details {
+        source_type = "image"
+        image_id   = data.oci_core_images.oracle_linux.images[0].id
+      }
+
+      create_vnic_details {
+        subnet_id        = oci_core_subnet.subnet.id
+        assign_public_ip = true
+      }
+
+      metadata = {
+        ssh_authorized_keys = tls_private_key.instance_ssh.public_key_openssh
+        user_data           = base64encode(data.template_file.user_data.rendered)
+      }
+    }
+  }
+}
+
+############################################
+# Instance Pool
+############################################
+resource "oci_core_instance_pool" "app_pool" {
+  compartment_id            = var.compartment_ocid
+  instance_configuration_id = oci_core_instance_configuration.instance_config.id
+  size                      = 1
+  display_name              = "${var._oci_instance.display_name}-instance-pool"
+
+  placement_configurations {
+    availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+    primary_subnet_id   = oci_core_subnet.subnet.id
+  }
+
+  # Auto-registro en LB backend sets
+  load_balancers {
+    backend_set_name = oci_load_balancer_backend_set.backend_set_streamlit.name
+    load_balancer_id = oci_load_balancer_load_balancer.flexible_lb.id
+    port             = 8501
+    vnic_selection   = "PrimaryVnic"
+  }
+
+  load_balancers {
+    backend_set_name = oci_load_balancer_backend_set.audio_backend_set.name
+    load_balancer_id = oci_load_balancer_load_balancer.flexible_lb.id
+    port             = 8000
+    vnic_selection   = "PrimaryVnic"
+  }
+}
+
+
+############################################
+# Autoscaling Configuration
+############################################
+resource "oci_autoscaling_auto_scaling_configuration" "autoscaling_config" {
   compartment_id      = var.compartment_ocid
-  shape               = var._oci_instance.shape.name
+  display_name        = "${var._oci_instance.display_name}-autoscale"
+  cool_down_in_seconds = 300
+  is_enabled          = true
 
-  source_details {
-    source_id   = data.oci_core_images.oracle_linux.images[0].id
-    source_type = "image"
+  auto_scaling_resources {
+    id   = oci_core_instance_pool.app_pool.id
+    type = "instancePool"
   }
 
-  shape_config {
-    memory_in_gbs = var._oci_instance.shape.memory_in_gbs
-    ocpus         = var._oci_instance.shape.ocpus
+  policies {
+
+    capacity {
+      initial = 1
+      min     = 1
+      max     = 5
+    }
+
+    policy_type = "threshold"
+    rules {
+      display_name = "scale_up_rule"
+      action {
+        type = "CHANGE_COUNT_BY"
+        value = 1
+      }
+      metric {
+        metric_type = "CPU_UTILIZATION"
+        threshold {
+          operator = "GT"
+          value    = 70
+        }
+      }
+    }
+
+    rules {
+      display_name = "scale_down_rule"
+      action {
+        type = "CHANGE_COUNT_BY"
+        value = -1
+      }
+      metric {
+        metric_type = "CPU_UTILIZATION"
+        threshold {
+          operator = "LT"
+          value    = 30
+        }
+      }
+    }
   }
 
-  create_vnic_details {
-    subnet_id        = oci_core_subnet.subnet.id
-    assign_public_ip = true
-  }
-
-  display_name = var._oci_instance.display_name
-
-  metadata = {
-    ssh_authorized_keys = tls_private_key.instance_ssh.public_key_openssh
-    #https://cloudinit.readthedocs.io/en/latest/explanation/format.html
-    user_data           = base64encode(data.template_file.user_data.rendered)
-  }
-
-  depends_on = [
-    oci_objectstorage_object.adb_wallet_zip
-  ]
 }
 
-############################################
-# Wait until user_data.sh finishes
-############################################
-
-resource "null_resource" "wait_for_userdata" {
-  depends_on = [oci_core_instance.linux_instance]
-
-  connection {
-    type        = "ssh"
-    host        = oci_core_instance.linux_instance.public_ip
-    user        = "opc"
-    private_key = tls_private_key.instance_ssh.private_key_pem
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "echo '[INI] Setup started...............'",
-      "while ! grep -q 'Cloud-init v.* finished at' /var/log/cloud-init-output.log; do sleep 10; done",
-      "echo ''",
-      "echo ''",
-      "echo 'Network URL: http://${oci_core_instance.linux_instance.public_ip}:8501'",
-      "echo ''",
-      "echo ''",
-      "echo '[END] Setup completed.............'",
-    ]
-  }
-}

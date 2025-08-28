@@ -174,3 +174,45 @@ variable "_oci_instance" {
     }
   }
 }
+
+
+############################################
+# Load Balancer
+############################################
+
+variable "_lb_name" {
+  description = "LB [variables.tf][⚠️ No changes required]"
+  
+  default = "lb-oracle-ai"
+}
+
+variable "lb_reserved_ip_id" {
+  description = "🔐 OCID de la IP reservada para el Load Balancer."
+  type        = string
+  
+  validation {
+    condition     = length(var.lb_reserved_ip_id) > 0
+    error_message = "El nombre del [LB Reserved IP OCID] no puede estar vacío."
+  }
+}
+
+variable "certificate_private_key" {
+  description = "🔐 private key"
+  type        = string
+  
+  validation {
+    condition     = length(var.certificate_private_key) > 0
+    error_message = "El nombre del [CERTIFICATE PRIVATE KEY] no puede estar vacío."
+  }
+}
+
+variable "certificate_public_certificate" {
+  description = "🔐 Public Certificate."
+  type        = string
+  
+  validation {
+    condition     = length(var.certificate_public_certificate) > 0
+    error_message = "El nombre del [CERTIFICATE PUBLIC CERTIFICATE] no puede estar vacío."
+  }
+}
+

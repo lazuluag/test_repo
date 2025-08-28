@@ -88,5 +88,5 @@ cd /home/opc/oracle-ai-accelerator/app
 source /home/opc/miniconda3/etc/profile.d/conda.sh
 echo "Using Python from: $(conda run -n ORACLE-AI which python)"
 nohup conda run -n ORACLE-AI streamlit run app.py --server.port 8501 --logger.level=INFO > /home/opc/streamlit.log 2>&1 &
-nohup conda run -n ORACLE-AI uvicorn audio_backend:app --host 0.0.0.0 --port 8000 --logger.level=INFO > /home/opc/audio_backend.log 2>&1 &
+nohup conda run -n ORACLE-AI uvicorn audio_backend:app --host 0.0.0.0 --port 8000 --log-level info > /home/opc/audio_backend.log 2>&1 &
 EOF
