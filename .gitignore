@@ -2,3 +2,5 @@ __pycache__
 files
 app/data
 node_modules
+config
+key.pem
