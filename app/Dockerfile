@@ -12,6 +12,7 @@ COPY services /app/services
 COPY pages /app/pages
 COPY my_component /app/my_component
 COPY components /app/components
+COPY images /app/images
 COPY .env /app
 
 RUN mkdir -p /root/.oci
