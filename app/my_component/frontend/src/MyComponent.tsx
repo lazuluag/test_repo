@@ -28,7 +28,7 @@ function MyComponent({ disabled }: ComponentProps) {
 
   const startRecording = useCallback(async () => {
     try {
-      const ws = new WebSocket("ws://145.241.213.159/ws/audio")
+      const ws = new WebSocket("ws://130.162.174.68/ws/audio")
       wsRef.current = ws
 
       ws.onopen = () => {
