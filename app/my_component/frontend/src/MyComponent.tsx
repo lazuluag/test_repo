@@ -21,17 +21,37 @@ function MyComponent({ disabled }: ComponentProps) {
   const audioContextRef = useRef<AudioContext | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
 
-  useEffect(() => {
-    Streamlit.setFrameHeight()
-    return () => stopRecording()
-  }, [])
+  // useEffect(() => {
+  //   Streamlit.setFrameHeight()
+  //   return () => stopRecording()
+  // }, [])
+
+    // Cerrar socket al desmontar el componente
+    useEffect(() => {
+      Streamlit.setFrameHeight();
+      return () => {
+        stopRecording();
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+      };
+    }, []);
+  
 
   const startRecording = useCallback(async () => {
     try {
-      const ws = new WebSocket("ws://localhost:8000/ws/audio")
+      // Cerrar socket viejo si existe
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+
+      const ws = new WebSocket("wss://130.162.174.68/ws/audio")
       wsRef.current = ws
 
       ws.onopen = () => {
+        console.log("WebSocket abierto");
         ws.send(JSON.stringify({ type: "start" }))
       }
 
@@ -80,7 +100,11 @@ function MyComponent({ disabled }: ComponentProps) {
 
   const stopRecording = useCallback(() => {
     try {
-      wsRef.current?.send(JSON.stringify({ type: "stop" }))
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "stop" }));
+      }
+
+      // wsRef.current?.send(JSON.stringify({ type: "stop" }))
       // wsRef.current?.close()
       // wsRef.current = null
 
@@ -98,16 +122,20 @@ function MyComponent({ disabled }: ComponentProps) {
   }, [])
 
   const resetRecording = useCallback(() => {
-    console.log("[UI] resetRecording() ws:", wsRef.current?.readyState)
-    wsRef.current?.send(JSON.stringify({ type: "reset" }))
-  
-    wsRef.current?.close()
-    wsRef.current = null
-  
-    setHasRecorded(false)
-    Streamlit.setComponentValue({ type: "reset" })
-  }, [])
+    try {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "reset" }));
+      }
+      wsRef.current?.close();
+      wsRef.current = null;
 
+      setHasRecorded(false);
+      Streamlit.setComponentValue({ type: "reset" });
+    } catch (err) {
+      console.error("Error resetting recording:", err);
+    }
+  }, []);
+  
   // 🎨 estilo común de los botones
   const buttonStyle = (active: boolean) => ({
     backgroundColor: active ? "#e53935" : "#1e1e1e", // rojo si activo, negro si no

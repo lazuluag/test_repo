@@ -9,6 +9,10 @@ app = FastAPI()
 # -----------------------------
 # Endpoint WebSocket de audio
 # -----------------------------
+@app.get("/health")
+async def health():
+    return {"status": "ok"} 
+    
 @app.websocket("/ws/audio")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

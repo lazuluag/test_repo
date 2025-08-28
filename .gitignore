@@ -4,3 +4,5 @@ __pycache__
 files
 app/data
 node_modules
+key_ca.pem
+cert.pem

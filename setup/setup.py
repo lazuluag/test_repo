@@ -25,6 +25,22 @@ is_windows = "--windows" in sys.argv or platform.system() == "Windows"
 
 # Generar archivo filtrado si es Linux
 req_file = "requirements.txt"
+if is_linux:
+    req_filtered = "requirements.filtered.txt"
+    skip_pkgs = ["PyAudio"]
+    with open("requirements.txt", "r") as src, open(req_filtered, "w") as dst:
+        for line in src:
+            if not any(pkg in line for pkg in skip_pkgs):
+                dst.write(line)
+    req_file = req_filtered
+elif is_windows:
+    req_filtered = "requirements.filtered.txt"
+    skip_pkgs = ["fastapi", "uvicorn[standard]"]
+    with open("requirements.txt", "r") as src, open(req_filtered, "w") as dst:
+        for line in src:
+            if not any(pkg in line for pkg in skip_pkgs):
+                dst.write(line)
+    req_file = req_filtered
 
 # Verificar si el archivo .env existe
 if not os.path.exists(env_path):
@@ -155,10 +171,10 @@ def exec(user, file_name, message):
         cursor = connection.cursor()
         for statement in statements:
             # Omitir si se cumple: Linux + contiene "6" + archivo específico
-            if is_linux and file_name == 'd.TABLE_MODULES.sql' and 'AI Speech to Text Real-Time' in statement:
-                print(f'  > [SKIPPED on Linux - Module:6]:\n')
-                print(f'    {statement}\n')
-                continue
+            # if is_linux and file_name == 'd.TABLE_MODULES.sql' and 'AI Speech to Text Real-Time' in statement:
+            #     print(f'  > [SKIPPED on Linux - Module:6]:\n')
+            #     print(f'    {statement}\n')
+            #     continue
 
             # Eliminar el último carácter si es un ';'
             if statement.endswith(';'):
@@ -191,223 +207,119 @@ def exec(user, file_name, message):
             sys.exit(1)
 
 def main():
+    print(f'\n                                                       [ SETUP ][ ANACONDA ]')
+    print(f'----------------------------------------------------------------------------')
+    
+    conda(f'conda --version', 
+          f'[OK] CHECK CONDA.............................................[ CHECK_CONDA ]')
 
-    if is_linux:
+    conda(f'conda run -n base pip install --force-reinstall oci oracledb --upgrade --user',
+          f'[OK] PIP INSTALL OCI & ORACLEDB IN CONDA BASE.................[ CONDA_BASE ]')
 
-        print(f'\n                                                       [ SETUP ][ HOST ]')
-        print(f'----------------------------------------------------------------------------')
+    conda(f'conda run -n base pip install --force-reinstall python-dotenv --no-warn-script-location --upgrade --user', 
+          f'[OK] PIP INSTALL PYTHON-DOTENV IN CONDA BASE..................[ CONDA_BASE ]')
+    
+    # Cargar variables del archivo .env
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=env_path)
+    
+    # CONFIG: CONDA
+    con_conda_env_name    = os.getenv('CON_CONDA_ENV_NAME')
+    # ADW23ai: Admin
+    con_adb_adm_user_name = os.getenv('CON_ADB_ADM_USER_NAME')
+    # ADW23ai: Developer
+    con_adb_dev_user_name = os.getenv('CON_ADB_DEV_USER_NAME')
 
-        # Instalar librerías necesarias directamente en el host
-        print("\n[INSTALL LIBRARIES ON HOST]")
-        try:
-            # OCI y oracledb
-            subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "--upgrade", "oci", "oracledb"], check=True)
-            print("[OK] PIP INSTALL OCI & ORACLEDB ON HOST")
+    conda(f'conda remove --name {con_conda_env_name} --all -y', 
+          f'[OK] CONDA REMOVE......................................[ CONDA_ENVIRONMENT ]')
+          
+    conda(f'conda create -n {con_conda_env_name} python=3.10 -y', 
+          f'[OK] CONDA CREATE ENVIRONMENT..........................[ CONDA_ENVIRONMENT ]')
+    
+    conda(f'conda run -n {con_conda_env_name} conda install -c conda-forge python-graphviz -y', 
+          f'[OK] CONDA INSTALL GRAPHVIZ................................[ CONDA_INSTALL ]')
+    
+    conda(f'conda run -n {con_conda_env_name} pip install -r {req_file}',
+      f'[OK] PIP INSTALL REQUIREMENTS..........................[ CONDA_ENVIRONMENT ]')
+    
+    print(f'\n                                                     [ VALIDATION ][ TOOLS ]')
+    print(f'----------------------------------------------------------------------------')
 
-            # python-dotenv
-            subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "--upgrade", "python-dotenv"], check=True)
-            print("[OK] PIP INSTALL PYTHON-DOTENV ON HOST")
-        except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Instalación de librerías falló: {e}")
-            sys.exit(1)
+    conda(f'python tool.config.py', 
+          f'[OK] CONFIG FILE..............................................[ VALID_TOOL ]')
+    
+    conda(f'python tool.bucket.py', 
+          f'[OK] BUCKET ACCESS............................................[ VALID_TOOL ]')
+    
+    conda(f'python tool.autonomos.connection.py', 
+          f'[OK] AUTONOMOUS DATABASE CONNECTION...........................[ VALID_TOOL ]')
 
+    print(f'\n                                            [ SETUP ][ AUTONOMOUS DATABASE ]')
+    print(f'----------------------------------------------------------------------------')
 
-        # Cargar variables del archivo .env
-        from dotenv import load_dotenv
-        load_dotenv(dotenv_path=env_path)
+    print(f'[USER: {con_adb_adm_user_name}]')
+    
+    exec('admin', 'b.CREATE_USER.sql',
+        '[OK][B] CREATE USER DEVELOPER................................[ CREATE_USER ]')
 
-        # Variables importantes
-        con_adb_adm_user_name = os.getenv('CON_ADB_ADM_USER_NAME')
-        con_adb_dev_user_name = os.getenv('CON_ADB_DEV_USER_NAME')
+    exec('admin', 'c.GRANT_USER.sql',
+        '[OK][C] GRANT TO DEVELOPER....................................[ GRANT_USER ]')
+    
+    exec('admin', 'd.DBMS_NETWORK_ACL_ADMIN.sql',
+        '[OK][D] APPEND_HOST_ACE...........................[ DBMS_NETWORK_ACL_ADMIN ]')
+    
+    print(f'\n[USER: {con_adb_dev_user_name}]')
 
+    exec('developer', 'a.DBMS_VECTOR.sql',
+        '[OK][A] DBMS_VECTOR.CREATE_CREDENTIAL........................[ DBMS_VECTOR ]')
 
-        # VALIDACIÓN DE HERRAMIENTAS
-        print(f'\n                                                     [ VALIDATION ][ TOOLS ]')
-        print(f'----------------------------------------------------------------------------')
+    exec('developer', 'b.TABLE_USER_GROUP.sql',
+        '[OK][B] CREATE TABLE USER_GROUP.............................[ CREATE_TABLE ]')    
 
-        try:
-            subprocess.run([sys.executable, "tool.config.py"], check=True)
-            print("[OK] CONFIG FILE..............................................[ VALID_TOOL ]")
+    exec('developer', 'c.TABLE_USERS.sql',
+        '[OK][C] CREATE TABLE USERS..................................[ CREATE_TABLE ]')
 
-            subprocess.run([sys.executable, "tool.bucket.py"], check=True)
-            print("[OK] BUCKET ACCESS............................................[ VALID_TOOL ]")
+    exec('developer', 'd.TABLE_MODULES.sql',
+        '[OK][D] CREATE TABLE MODULES................................[ CREATE_TABLE ]')
 
-            subprocess.run([sys.executable, "tool.autonomos.connection.py"], check=True)
-            print("[OK] AUTONOMOUS DATABASE CONNECTION...........................[ VALID_TOOL ]")
-        except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Validación de herramientas falló: {e}")
-            sys.exit(1)
+    exec('developer', 'e.TABLE_AGENT_MODELS.sql',
+        '[OK][E] CREATE TABLE AGENT_MODELS...........................[ CREATE_TABLE ]')
+    
+    exec('developer', 'f.TABLE_AGENTS.sql',
+        '[OK][F] CREATE TABLE AGENTS.................................[ CREATE_TABLE ]')
 
-        # SETUP AUTONOMOUS DATABASE
-        print(f'\n                                            [ SETUP ][ AUTONOMOUS DATABASE ]')
-        print(f'----------------------------------------------------------------------------')
+    exec('developer', 'g.TABLE_AGENT_USER.sql',
+        '[OK][G] CREATE TABLE AGENT_USER.............................[ CREATE_TABLE ]')
+    
+    exec('developer', 'h.TABLE_FILES.sql',
+        '[OK][H] CREATE TABLE FILES..................................[ CREATE_TABLE ]')
 
-        print(f'[USER: {con_adb_adm_user_name}]')
+    exec('developer', 'i.TABLE_FILE_USER.sql',
+        '[OK][I] CREATE TABLE FILE_USER..............................[ CREATE_TABLE ]')
+    
+    exec('developer', 'j.TABLE_DOCS.sql',
+        '[OK][J] CREATE TABLE DOCS...................................[ CREATE_TABLE ]')
 
-        exec('admin', 'b.CREATE_USER.sql', '[OK][B] CREATE USER DEVELOPER................................[ CREATE_USER ]')
-        exec('admin', 'c.GRANT_USER.sql', '[OK][C] GRANT TO DEVELOPER....................................[ GRANT_USER ]')
-        exec('admin', 'd.DBMS_NETWORK_ACL_ADMIN.sql', '[OK][D] APPEND_HOST_ACE...........................[ DBMS_NETWORK_ACL_ADMIN ]')
+    exec('developer', 'k.SP_SEL_AI_TBL_CSV.sql',
+        '[OK][K] CREATE PROCEDURE FOR SELECT AI [CSV]............[ CREATE_PROCEDURE ]')
 
-        print(f'\n[USER: {con_adb_dev_user_name}]')
+    exec('developer', 'l.SP_SEL_AI_PROFILE.sql',
+        '[OK][L] CREATE PROCEDURE FOR SELECT AI [PROFILE]......... CREATE_PROCEDURE ]')
 
-        exec('developer', 'a.DBMS_VECTOR.sql', '[OK][A] DBMS_VECTOR.CREATE_CREDENTIAL........................[ DBMS_VECTOR ]')
-        exec('developer', 'b.TABLE_USER_GROUP.sql', '[OK][B] CREATE TABLE USER_GROUP.............................[ CREATE_TABLE ]')    
-        exec('developer', 'c.TABLE_USERS.sql', '[OK][C] CREATE TABLE USERS..................................[ CREATE_TABLE ]')
-        exec('developer', 'd.TABLE_MODULES.sql', '[OK][D] CREATE TABLE MODULES................................[ CREATE_TABLE ]')
-        exec('developer', 'e.TABLE_AGENT_MODELS.sql', '[OK][E] CREATE TABLE AGENT_MODELS...........................[ CREATE_TABLE ]')
-        exec('developer', 'f.TABLE_AGENTS.sql', '[OK][F] CREATE TABLE AGENTS.................................[ CREATE_TABLE ]')
-        exec('developer', 'g.TABLE_AGENT_USER.sql', '[OK][G] CREATE TABLE AGENT_USER.............................[ CREATE_TABLE ]')
-        exec('developer', 'h.TABLE_FILES.sql', '[OK][H] CREATE TABLE FILES..................................[ CREATE_TABLE ]')
-        exec('developer', 'i.TABLE_FILE_USER.sql', '[OK][I] CREATE TABLE FILE_USER..............................[ CREATE_TABLE ]')
-        exec('developer', 'j.TABLE_DOCS.sql', '[OK][J] CREATE TABLE DOCS...................................[ CREATE_TABLE ]')
-        exec('developer', 'k.SP_SEL_AI_TBL_CSV.sql', '[OK][K] CREATE PROCEDURE FOR SELECT AI [CSV]............[ CREATE_PROCEDURE ]')
-        exec('developer', 'l.SP_SEL_AI_PROFILE.sql', '[OK][L] CREATE PROCEDURE FOR SELECT AI [PROFILE]......... CREATE_PROCEDURE ]')
-        exec('developer', 'm.SP_SEL_AI_RAG_PROFILE.sql', '[OK][M] CREATE PROCEDURE FOR SELECT AI RAG [PROFILE]....[ CREATE_PROCEDURE ]')
-        exec('developer', 'n.VW_DOCS_FILES.sql', '[OK][N] CREATE VIEW DOCS FOR VECTOS STORE....................[ CREATE_VIEW ]')
-        exec('developer', 'o.SP_VECTOR_STORE.sql', '[OK][O] CREATE PROCEDURE VECTOS STORRE.......................[ CREATE_VIEW ]')
+    exec('developer', 'm.SP_SEL_AI_RAG_PROFILE.sql',
+        '[OK][M] CREATE PROCEDURE FOR SELECT AI RAG [PROFILE]....[ CREATE_PROCEDURE ]')
 
-        # SETUP DOCKER
-        print(f'\n                                            [ SETUP ][ DOCKER ]')
-        print(f'----------------------------------------------------------------------------')
+    exec('developer', 'n.VW_DOCS_FILES.sql',
+        '[OK][N] CREATE VIEW DOCS FOR VECTOS STORE....................[ CREATE_VIEW ]')
 
-        print("\n[DOCKER MODE - LINUX DETECTED]")
-
-
-        # Verificar Docker y docker compose
-        try:
-            subprocess.run(["docker", "--version"], check=True)
-            subprocess.run(["docker compose", "--version"], check=True)
-        except subprocess.CalledProcessError:
-            print("[ERROR] Docker y docker compose deben estar instalados.")
-            sys.exit(1)
-
-        # # Levantar contenedores Docker
-        # docker_compose_file = os.path.join(file_path, "linux_containers", "docker-compose.yml")
-        # subprocess.run(
-        #     ["docker compose", "-f", docker_compose_file, "up", "--build", "-d"],
-        #     check=True
-        # )
-
-        # print("[OK] Contenedores backend y frontend levantados en Docker.")
-        sys.exit(0)
-        
-    else: 
-        print(f'\n                                                       [ SETUP ][ CONDA ]')
-        print(f'----------------------------------------------------------------------------')
-
-        conda(f'conda --version', 
-            f'[OK] CHECK CONDA.............................................[ CHECK_CONDA ]')
-
-        conda(f'conda run -n base pip install --force-reinstall oci oracledb --upgrade --user',
-            f'[OK] PIP INSTALL OCI & ORACLEDB IN CONDA BASE.................[ CONDA_BASE ]')
-
-        conda(f'conda run -n base pip install --force-reinstall python-dotenv --no-warn-script-location --upgrade --user', 
-            f'[OK] PIP INSTALL PYTHON-DOTENV IN CONDA BASE..................[ CONDA_BASE ]')
-        
-        # Cargar variables del archivo .env
-        from dotenv import load_dotenv
-        load_dotenv(dotenv_path=env_path)
-        
-        # CONFIG: CONDA
-        con_conda_env_name    = os.getenv('CON_CONDA_ENV_NAME')
-        # ADW23ai: Admin
-        con_adb_adm_user_name = os.getenv('CON_ADB_ADM_USER_NAME')
-        # ADW23ai: Developer
-        con_adb_dev_user_name = os.getenv('CON_ADB_DEV_USER_NAME')
-
-        conda(f'conda remove --name {con_conda_env_name} --all -y', 
-            f'[OK] CONDA REMOVE......................................[ CONDA_ENVIRONMENT ]')
-            
-        conda(f'conda create -n {con_conda_env_name} python=3.10 -y', 
-            f'[OK] CONDA CREATE ENVIRONMENT..........................[ CONDA_ENVIRONMENT ]')
-        
-        conda(f'conda run -n {con_conda_env_name} conda install -c conda-forge python-graphviz -y', 
-            f'[OK] CONDA INSTALL GRAPHVIZ................................[ CONDA_INSTALL ]')
-        
-        conda(f'conda run -n {con_conda_env_name} pip install -r {req_file}',
-        f'[OK] PIP INSTALL REQUIREMENTS..........................[ CONDA_ENVIRONMENT ]')
-        
-        print(f'\n                                                     [ VALIDATION ][ TOOLS ]')
-        print(f'----------------------------------------------------------------------------')
-
-        conda(f'python tool.config.py', 
-            f'[OK] CONFIG FILE..............................................[ VALID_TOOL ]')
-        
-        conda(f'python tool.bucket.py', 
-            f'[OK] BUCKET ACCESS............................................[ VALID_TOOL ]')
-        
-        conda(f'python tool.autonomos.connection.py', 
-            f'[OK] AUTONOMOUS DATABASE CONNECTION...........................[ VALID_TOOL ]')
-
-        print(f'\n                                            [ SETUP ][ AUTONOMOUS DATABASE ]')
-        print(f'----------------------------------------------------------------------------')
-
-        print(f'[USER: {con_adb_adm_user_name}]')
-        
-        exec('admin', 'b.CREATE_USER.sql',
-            '[OK][B] CREATE USER DEVELOPER................................[ CREATE_USER ]')
-
-        exec('admin', 'c.GRANT_USER.sql',
-            '[OK][C] GRANT TO DEVELOPER....................................[ GRANT_USER ]')
-        
-        exec('admin', 'd.DBMS_NETWORK_ACL_ADMIN.sql',
-            '[OK][D] APPEND_HOST_ACE...........................[ DBMS_NETWORK_ACL_ADMIN ]')
-        
-        print(f'\n[USER: {con_adb_dev_user_name}]')
-
-        exec('developer', 'a.DBMS_VECTOR.sql',
-            '[OK][A] DBMS_VECTOR.CREATE_CREDENTIAL........................[ DBMS_VECTOR ]')
-
-        exec('developer', 'b.TABLE_USER_GROUP.sql',
-            '[OK][B] CREATE TABLE USER_GROUP.............................[ CREATE_TABLE ]')    
-
-        exec('developer', 'c.TABLE_USERS.sql',
-            '[OK][C] CREATE TABLE USERS..................................[ CREATE_TABLE ]')
-
-        exec('developer', 'd.TABLE_MODULES.sql',
-            '[OK][D] CREATE TABLE MODULES................................[ CREATE_TABLE ]')
-
-        exec('developer', 'e.TABLE_AGENT_MODELS.sql',
-            '[OK][E] CREATE TABLE AGENT_MODELS...........................[ CREATE_TABLE ]')
-        
-        exec('developer', 'f.TABLE_AGENTS.sql',
-            '[OK][F] CREATE TABLE AGENTS.................................[ CREATE_TABLE ]')
-
-        exec('developer', 'g.TABLE_AGENT_USER.sql',
-            '[OK][G] CREATE TABLE AGENT_USER.............................[ CREATE_TABLE ]')
-        
-        exec('developer', 'h.TABLE_FILES.sql',
-            '[OK][H] CREATE TABLE FILES..................................[ CREATE_TABLE ]')
-
-        exec('developer', 'i.TABLE_FILE_USER.sql',
-            '[OK][I] CREATE TABLE FILE_USER..............................[ CREATE_TABLE ]')
-        
-        exec('developer', 'j.TABLE_DOCS.sql',
-            '[OK][J] CREATE TABLE DOCS...................................[ CREATE_TABLE ]')
-
-        exec('developer', 'k.SP_SEL_AI_TBL_CSV.sql',
-            '[OK][K] CREATE PROCEDURE FOR SELECT AI [CSV]............[ CREATE_PROCEDURE ]')
-
-        exec('developer', 'l.SP_SEL_AI_PROFILE.sql',
-            '[OK][L] CREATE PROCEDURE FOR SELECT AI [PROFILE]......... CREATE_PROCEDURE ]')
-
-        exec('developer', 'm.SP_SEL_AI_RAG_PROFILE.sql',
-            '[OK][M] CREATE PROCEDURE FOR SELECT AI RAG [PROFILE]....[ CREATE_PROCEDURE ]')
-
-        exec('developer', 'n.VW_DOCS_FILES.sql',
-            '[OK][N] CREATE VIEW DOCS FOR VECTOS STORE....................[ CREATE_VIEW ]')
-
-        exec('developer', 'o.SP_VECTOR_STORE.sql',
-            '[OK][O] CREATE PROCEDURE VECTOS STORRE.......................[ CREATE_VIEW ]')
-        
-        # Copiar .streamlit (Windows: C:\Users\<usuario>\.streamlit, mac: /Users/<usuario>/.streamlit)
-        source_streamlit = os.path.join(file_path, ".streamlit")
-        dest_streamlit = os.path.join(os.path.expanduser("~"), ".streamlit")
-        shutil.copytree(source_streamlit, dest_streamlit, dirs_exist_ok=True)
+    exec('developer', 'o.SP_VECTOR_STORE.sql',
+        '[OK][O] CREATE PROCEDURE VECTOS STORRE.......................[ CREATE_VIEW ]')
+    
+    # Copiar .streamlit (Windows: C:\Users\<usuario>\.streamlit, mac: /Users/<usuario>/.streamlit)
+    source_streamlit = os.path.join(file_path, ".streamlit")
+    dest_streamlit = os.path.join(os.path.expanduser("~"), ".streamlit")
+    shutil.copytree(source_streamlit, dest_streamlit, dirs_exist_ok=True)
     
     
 if __name__ == '__main__':
     main()
-
-# CMD> conda deactivate
-# CMD> conda remove --name ORACLE-AI --all -y
