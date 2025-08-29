@@ -5,4 +5,9 @@ showSidebarNavigation = false
 base = "dark"
 
 [server]
-maxUploadSize = 500
+headless = true
+port = 8501
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = false
+enableWebsocketCompression = false
