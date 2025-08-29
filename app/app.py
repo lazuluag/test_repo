@@ -421,6 +421,7 @@ if "username" in st.session_state and "user_id" in st.session_state:
 
                         if component_value:
                             event_type = component_value.get("type")
+                            print(event_type)
                             text = component_value.get("text", "")
 
                             if event_type == "start":

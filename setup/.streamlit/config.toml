@@ -6,3 +6,9 @@ base = "dark"
 
 [server]
 maxUploadSize = 500
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+address = "0.0.0.0"

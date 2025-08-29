@@ -141,3 +141,25 @@ resource "oci_load_balancer_listener" "http_listener" {
 
   rule_set_names = [oci_load_balancer_rule_set.http_redirect_ruleset.name]
 }
+
+############################################
+# Backends: Streamlit (Port 8501)
+############################################
+resource "oci_load_balancer_backend" "backend_streamlit" {
+  load_balancer_id = oci_load_balancer_load_balancer.flexible_lb.id
+  backend_set_name = oci_load_balancer_backend_set.backend_set_streamlit.name
+  ip_address       = oci_core_instance.linux_instance.private_ip
+  port             = 8501
+  weight           = 1
+}
+
+############################################
+# Backends: Audio (Port 8000)
+############################################
+resource "oci_load_balancer_backend" "backend_audio" {
+  load_balancer_id = oci_load_balancer_load_balancer.flexible_lb.id
+  backend_set_name = oci_load_balancer_backend_set.audio_backend_set.name
+  ip_address       = oci_core_instance.linux_instance.private_ip
+  port             = 8000
+  weight           = 1
+}
