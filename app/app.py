@@ -9,8 +9,8 @@ import threading
 import requests
 import base64
 import numpy as np
+import platform
 
-import services.oci_speech_realtime as oci_realtime
 from my_component import my_component
 
 from PIL import Image
@@ -20,6 +20,14 @@ import components as component
 import services.database as database
 import services as service
 import utils as utils
+
+is_linux   =  platform.system()  == "Linux"
+is_windows =  platform.system()  == "Windows"
+
+if is_linux:
+    import services.oci_speech_realtime_linux as oci_realtime
+elif is_windows:
+    import services.oci_speech_realtime as oci_realtime
 
 # Create service instances
 db_module_service             = database.ModuleService()
@@ -62,6 +70,16 @@ if "show_form_app" not in st.session_state:
     st.session_state["show_form_app"] = False
     st.session_state["form_mode_app"] = "create"
     st.session_state["selected_file"] = None
+
+
+def clear_rt_state(json_path):
+    st.session_state.uploaded_transcription.clear()
+    st.session_state.partial_text = ""
+    st.session_state.transcription_state = "idle"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump([], f)
+    render_transcriptions()
+
 
 if "username" in st.session_state and "user_id" in st.session_state:
     st.header(":material/book_ribbon: Knowledge")
@@ -312,7 +330,6 @@ if "username" in st.session_state and "user_id" in st.session_state:
                         )
 
                     
-                    uploaded_transcription = []
                     if selected_module_id == 6:
              
                         # Inicializar estado
@@ -324,6 +341,7 @@ if "username" in st.session_state and "user_id" in st.session_state:
                             st.session_state.transcription_state = "idle"
 
                         # Contenedores UI
+                        title_ph = st.empty()
                         transcription_container = st.empty()
                         status_caption = st.empty()
 
@@ -339,77 +357,53 @@ if "username" in st.session_state and "user_id" in st.session_state:
                                     st.session_state.uploaded_transcription = json.load(f)
                                 except:
                                     st.session_state.uploaded_transcription = []
-
-
-                        # Función para renderizar transcripciones
-                        # def render_transcriptions():
-                        #     transcription_html = ""
-                        #     for item in st.session_state.uploaded_transcription:
-                        #         transcription_html += f"""
-                        #             <div style="background-color:#21232B; padding:10px; border-radius:5px; margin-bottom:10px;">
-                        #                 <div style="display:flex; justify-content:space-between;">
-                        #                     <div style="width:35px; background-color:#E6A538; color:black; border-radius:5px; margin:2px; display:flex; align-items:center; justify-content:center;">
-                        #                         {item['id']}</div>
-                        #                     <div style="width:100%; margin:2px; padding:5px;">{item['transcription']}</div>
-                        #                 </div>
-                        #             </div>
-                        #         """
-                        #     if st.session_state.partial_text:
-                        #         transcription_html += f"""
-                        #             <div style="background-color:#2A2A2A; padding:10px; border-radius:5px; margin-bottom:10px; opacity:0.6;">
-                        #                 <div style="display:flex; justify-content:space-between;">
-                        #                     <div style="width:35px; background-color:#AAAAAA; color:black; border-radius:5px; margin:2px; display:flex; align-items:center; justify-content:center;">
-                        #                         •••</div>
-                        #                     <div style="width:100%; margin:2px; padding:5px;">{st.session_state.partial_text}</div>
-                        #                 </div>
-                        #             </div>
-                        #         """
-
-                        #     with transcription_container.container(border=True):
-                        #         st.markdown(":speech_balloon: :red[Real-Time] ***Customer Voice Transcription***")
-                        #         components.html(f"""
-                        #             <div id="scrollable-transcription" style="height:550px; overflow-y:auto; background-color:#1e1e1e; padding:10px; border-radius:10px; color:white; font-family:monospace;">
-                        #                 {transcription_html}
-                        #             </div>
-                        #             <script>
-                        #                 var div = window.parent.document.querySelectorAll('iframe[srcdoc]')[window.parent.document.querySelectorAll('iframe[srcdoc]').length - 1].contentWindow.document.getElementById('scrollable-transcription');
-                        #                 if (div) div.scrollTop = div.scrollHeight;
-                        #             </script>
-                        #         """, height=570)
+                        
+                        
+                        title_ph.markdown(":speech_balloon: :red[Real-Time] ***Customer Voice Transcription***")
+                        
                         def render_transcriptions():
                             transcription_html = ""
                             for item in st.session_state.uploaded_transcription:
                                 transcription_html += f"""
                                     <div style="background-color:#21232B; padding:10px; border-radius:5px; margin-bottom:10px;">
                                         <div style="display:flex; justify-content:space-between;">
-                                            <div style="width:35px; background-color:#E6A538; color:black; border-radius:5px; margin:2px; display:flex; align-items:center; justify-content:center;">
-                                                {item['id']}</div>
+                                            <div style="width:35px; background-color:#E6A538; color:black; border-radius:5px;
+                                                        margin:2px; display:flex; align-items:center; justify-content:center;">
+                                                {item['id']}
+                                            </div>
                                             <div style="width:100%; margin:2px; padding:5px;">{item['transcription']}</div>
                                         </div>
                                     </div>
                                 """
                             if st.session_state.partial_text:
                                 transcription_html += f"""
-                                    <div style="background-color:#2A2A2A; padding:10px; border-radius:5px; margin-bottom:10px; opacity:0.6;">
+                                    <div style="background-color:#2A2A2A; padding:10px; border-radius:5px;
+                                                margin-bottom:10px; opacity:0.6;">
                                         <div style="display:flex; justify-content:space-between;">
-                                            <div style="width:35px; background-color:#AAAAAA; color:black; border-radius:5px; margin:2px; display:flex; align-items:center; justify-content:center;">
-                                                •••</div>
+                                            <div style="width:35px; background-color:#AAAAAA; color:black; border-radius:5px;
+                                                        margin:2px; display:flex; align-items:center; justify-content:center;">
+                                                •••
+                                            </div>
                                             <div style="width:100%; margin:2px; padding:5px;">{st.session_state.partial_text}</div>
                                         </div>
                                     </div>
                                 """
 
                             with transcription_container:
-                                st.markdown(":speech_balloon: :red[Real-Time] ***Customer Voice Transcription***")
-                                st.components.v1.html(f"""
-                                    <div id="scrollable-transcription" style="height:550px; overflow-y:auto; background-color:#1e1e1e; padding:10px; border-radius:10px; color:white; font-family:monospace;">
+                                st.components.v1.html(
+                                    f"""
+                                    <div id="scrollable-transcription"
+                                        style="height:550px; overflow-y:auto; background-color:#1e1e1e;
+                                                padding:10px; border-radius:10px; color:white; font-family:monospace;">
                                         {transcription_html}
                                     </div>
                                     <script>
                                         var div = document.getElementById('scrollable-transcription');
                                         if (div) div.scrollTop = div.scrollHeight;
                                     </script>
-                                """, height=570)
+                                    """,
+                                    height=570
+                                )
 
                         # Render inicial
                         render_transcriptions()
@@ -421,11 +415,11 @@ if "username" in st.session_state and "user_id" in st.session_state:
 
                         if component_value:
                             event_type = component_value.get("type")
-                            print(event_type)
                             text = component_value.get("text", "")
 
                             if event_type == "start":
                                 st.session_state.transcription_state = "running"
+                                print("start")
                                 status_caption.markdown(":material/mic: **:green[Starting Transcription...]**")
 
                             elif event_type == "stop":
@@ -450,16 +444,12 @@ if "username" in st.session_state and "user_id" in st.session_state:
                                 render_transcriptions()
 
                             elif event_type == "reset":
-                                print("reset")
-                                st.session_state.uploaded_transcription.clear()
-                                st.session_state.partial_text = ""
-                                st.session_state.transcription_state = "idle"
-                                with open(json_path, "w", encoding="utf-8") as f:
-                                    json.dump([], f)
+                                #print("reset")
+                                clear_rt_state(json_path)
                                 render_transcriptions()
                                 status_caption.markdown(":material/cached: **:gray[Transcription Reset...]**")
                                 
-
+       
                     file_description = st.text_area("File Description")                    
 
                     # ← CAMBIO: Preparar lista de items a procesar: uno(s) archivo(s) o la grabación
@@ -700,11 +690,11 @@ if "username" in st.session_state and "user_id" in st.session_state:
                                             
                                             # Real-Time Transcription
                                             service.stop_realtime_session()
-                                            uploaded_transcription.clear()
-                                            with open(json_path, "w", encoding="utf-8") as f:
-                                                json.dump([], f)
+                                            clear_rt_state(json_path)
+                                        
                                             render_transcriptions()
                                             status_caption.caption("")
+
 
                                     # Update Extraction
                                     file_trg_tot_time = utl_function_service.track_time(0)
@@ -778,6 +768,7 @@ if "username" in st.session_state and "user_id" in st.session_state:
 
                     if btn_col2.button("Cancel", use_container_width=True):
                         st.session_state["show_form_app"] = False
+                        clear_rt_state(json_path)
                         st.rerun()
                 else:
                     st.warning("No modules found for this user.", icon=":material/warning:")
@@ -875,8 +866,7 @@ if "username" in st.session_state and "user_id" in st.session_state:
                             component.get_success(msg, icon=":material/update:")
                             db_file_service.get_all_file_user_cache(user_id, force_update=True)
                             db_file_service.get_all_files_cache(user_id, force_update=True)
-                            st.session_state.uploaded_transcription.clear()
-                            st.session_state.partial_text = ""
+
                             st.session_state["show_form_app"] = False
                             st.rerun()
                         else:
@@ -887,8 +877,7 @@ if "username" in st.session_state and "user_id" in st.session_state:
                         component.get_processing(False)
 
                 if btn_col2.button("Cancel", use_container_width=True):
-                    st.session_state.uploaded_transcription.clear()
-                    st.session_state.partial_text = ""
+    
                     st.session_state["show_form_app"] = False
                     st.rerun()
 

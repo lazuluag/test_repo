@@ -17,25 +17,39 @@ systemctl enable firewalld
 # Step 4: Open required ports in the firewall (Streamlit and VNC)
 firewall-cmd --add-port=8501/tcp --permanent
 firewall-cmd --add-port=5901/tcp --permanent
-firewall-cmd --add-port=8000/tcp --permanent
 firewall-cmd --reload
 
-# Step 5: Download and install Miniconda for the opc user
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/opc/Miniconda3.sh
-chmod +x /home/opc/Miniconda3.sh
-/home/opc/Miniconda3.sh -b -u -p /home/opc/miniconda3
+# Step 5: Install Docker Engine
+dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+dnf install -y docker-ce docker-ce-cli containerd.io
 
-# Step 6: Configure Conda for the opc user environment
-echo 'export PATH=/home/opc/miniconda3/bin:$PATH' >> /home/opc/.bashrc
-echo 'source /home/opc/miniconda3/etc/profile.d/conda.sh' >> /home/opc/.bashrc
-chown opc:opc /home/opc/.bashrc
+# Step 6: Enable and start Docker
+systemctl enable --now docker
+
+# Step 7: Add opc (o ec2-user) to docker group to run without sudo
+usermod -aG docker opc || true
+usermod -aG docker ec2-user || true
+
+# Step 8: Install Docker Compose plugin
+dnf install -y docker-compose-plugin
+
+# # Step 5: Download and install Miniconda for the opc user
+# wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/opc/Miniconda3.sh
+# chmod +x /home/opc/Miniconda3.sh
+# /home/opc/Miniconda3.sh -b -u -p /home/opc/miniconda3
+
+# # Step 6: Configure Conda for the opc user environment
+# echo 'export PATH=/home/opc/miniconda3/bin:$PATH' >> /home/opc/.bashrc
+# echo 'source /home/opc/miniconda3/etc/profile.d/conda.sh' >> /home/opc/.bashrc
+# chown opc:opc /home/opc/.bashrc
 
 # Step 7: Pre-accept Conda Terms of Service for required channels
-sudo -u opc -i bash -c 'source ~/.bashrc && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main'
-sudo -u opc -i bash -c 'source ~/.bashrc && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r'
+# sudo -u opc -i bash -c 'source ~/.bashrc && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main'
+# sudo -u opc -i bash -c 'source ~/.bashrc && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r'
+
 
 # Step 8: Clone the project repository
-git clone https://github.com/lazuluag/test_repo.git /home/opc/oracle-ai-accelerator
+git clone https://github.com/jganggini/oracle-ai-accelerator.git /home/opc/oracle-ai-accelerator
 chown -R opc:opc /home/opc/oracle-ai-accelerator
 
 # Step 9: Configure OCI CLI with credentials
@@ -74,19 +88,27 @@ echo "${env}" > /home/opc/oracle-ai-accelerator/app/.env
 chmod 600 /home/opc/oracle-ai-accelerator/app/.env
 chown opc:opc /home/opc/oracle-ai-accelerator/app/.env
 
-# Step 12: Run the setup script using Conda base environment as opc user
+# Step 12: Run the setup script 
 sudo -u opc -i bash <<'EOF'
 cd /home/opc/oracle-ai-accelerator/setup
-source /home/opc/miniconda3/etc/profile.d/conda.sh
-conda run -n base pip install --upgrade --force-reinstall python-dotenv
-conda run -n base python setup.py --linux
+pip3 install --upgrade --force-reinstall python-dotenv --user
+python3 setup.py --linux
 EOF
 
-# Step 13: Launch the Streamlit application using the ORACLE-AI Conda environment
+# Step 13: Launch the Streamlit application using Docker Compose 
 sudo -u opc -i bash <<'EOF'
 cd /home/opc/oracle-ai-accelerator/app
-source /home/opc/miniconda3/etc/profile.d/conda.sh
-echo "Using Python from: $(conda run -n ORACLE-AI which python)"
-nohup conda run -n ORACLE-AI streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --logger.level=INFO > /home/opc/streamlit.log 2>&1 &
-nohup conda run -n ORACLE-AI uvicorn audio_backend:app --host 0.0.0.0 --port 8000 --log-level info > /home/opc/audio_backend.log 2>&1 &
+echo "[INFO] Iniciando despliegue de contenedores con Docker Compose en background..."
+docker compose -f /home/opc/oracle-ai-accelerator/setup/linux_containers/docker-compose.yml up --build -d
+if [ $? -eq 0 ]; then
+    echo "[OK] Docker Compose se ejecutó correctamente."
+else
+    echo "[ERROR] Hubo un problema al ejecutar Docker Compose."
+    exit 1
+fi
+echo "[INFO] Redirigiendo logs de contenedores a archivos..."
+docker logs -f oracle_ai_audio_backend > /home/opc/oracle_ai_audio_backend.log 2>&1 &
+docker logs -f oracle_ai_frontend > /home/opc/oracle_ai_frontend.log 2>&1 &
+
+echo "[INFO] Contenedores levantados en background. Logs disponibles en /home/opc/*.log"
 EOF

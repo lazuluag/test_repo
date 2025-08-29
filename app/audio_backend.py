@@ -35,7 +35,7 @@ async def websocket_endpoint(ws: WebSocket):
       
             if isinstance(msg, dict) and msg.get("bytes") is not None:
                 audio_bytes = msg.get("bytes")
-                print(f"[BACKEND] Chunk binario recibido, {len(audio_bytes)} bytes")
+                #print(f"[BACKEND] Chunk binario recibido, {len(audio_bytes)} bytes")
                 # envia al wrapper OCI (asegúrate que acepta bytes PCM16)
                 await oci_realtime.send_chunk_from_browser(audio_bytes)
                 continue
@@ -55,6 +55,7 @@ async def websocket_endpoint(ws: WebSocket):
                 if msg_type == "start" and session_task is None:
                     # Iniciar sesión OCI
                     print("[BACKEND] Iniciando sesión OCI...")
+                    await ws.send_json({"type": "start"})
                     session_task = asyncio.create_task(
                         oci_realtime.start_realtime_session(
                             on_final,
@@ -62,20 +63,20 @@ async def websocket_endpoint(ws: WebSocket):
                             language="esa"  
                         )
                     )
-                    await ws.send_json({"type": "status", "text": "OCI session started"})
                     
-
+                    
                 elif msg_type == "chunk":
                     audio_bytes = base64.b64decode(msg["data"])
                     await oci_realtime.send_chunk_from_browser(audio_bytes)
 
                 elif msg_type == "stop":
                     print("[BACKEND] Stop recibido")
+                    await ws.send_json({"type": "stop"})
                     await oci_realtime.stop_realtime_session()
                     if session_task:
                         session_task.cancel()
                         session_task = None
-                    await ws.send_json({"type": "status", "text": "OCI session stopped"})
+                    
 
                 elif msg_type == "reset":
                     print("[BACKEND] Reset recibido")

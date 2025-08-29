@@ -15,7 +15,7 @@ function floatTo16BitPCM(float32Array: Float32Array): Uint8Array {
 
 function MyComponent({ disabled }: ComponentProps) {
   const [isRecording, setIsRecording] = useState(false)
-  const [hasRecorded, setHasRecorded] = useState(false) // para habilitar reset
+  const [hasRecorded, setHasRecorded] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -47,11 +47,12 @@ function MyComponent({ disabled }: ComponentProps) {
         wsRef.current = null;
       }
 
-      const ws = new WebSocket("wss://130.162.174.68/ws/audio")
+      const ws = new WebSocket("ws://localhost:8000/ws/audio")
       wsRef.current = ws
 
       ws.onopen = () => {
         console.log("WebSocket abierto");
+        Streamlit.setComponentValue({ type: "start" });
         ws.send(JSON.stringify({ type: "start" }))
       }
 
@@ -78,7 +79,7 @@ function MyComponent({ disabled }: ComponentProps) {
       const processor = audioContext.createScriptProcessor(2048, 1, 1);
 
       processor.onaudioprocess = (event) => {
-        console.log("Processing audio chunk...");
+        //console.log("Processing audio chunk...");
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           const input = event.inputBuffer.getChannelData(0);
           const pcm16 = floatTo16BitPCM(input);
@@ -102,6 +103,7 @@ function MyComponent({ disabled }: ComponentProps) {
     try {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "stop" }));
+        Streamlit.setComponentValue({ type: "stop" });
       }
 
       // wsRef.current?.send(JSON.stringify({ type: "stop" }))
@@ -136,7 +138,7 @@ function MyComponent({ disabled }: ComponentProps) {
     }
   }, []);
   
-  // 🎨 estilo común de los botones
+
   const buttonStyle = (active: boolean) => ({
     backgroundColor: active ? "#e53935" : "#1e1e1e", // rojo si activo, negro si no
     color: "white",
@@ -181,3 +183,4 @@ function MyComponent({ disabled }: ComponentProps) {
   )
 }
 export default withStreamlitConnection(MyComponent)
+

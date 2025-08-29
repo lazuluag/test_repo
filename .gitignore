@@ -6,3 +6,12 @@ app/data
 node_modules
 key_ca.pem
 cert.pem
+setup-tf/.oci/config 
+setup-tf/.oci/key.pem
+
+__pycache__
+*/.env
+.env 
+files
+app/data
+node_modules

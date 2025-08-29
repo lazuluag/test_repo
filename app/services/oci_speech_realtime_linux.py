@@ -44,7 +44,7 @@ class MyListener(RealtimeSpeechClientListener):
         self.on_partial = on_partial
 
     def on_result(self, result):
-        print("[DEBUG] on_result llamado con:", result)
+        #print("[DEBUG] on_result llamado con:", result)
         tx = result["transcriptions"][0]["transcription"]
         is_final = result["transcriptions"][0]["isFinal"]
 
@@ -122,7 +122,7 @@ async def send_chunk_from_browser(audio_bytes: bytes):
     if audio_queue is None:
         raise RuntimeError("Audio queue no inicializada. Inicia primero la sesión.")
     await audio_queue.put(audio_bytes)
-    print(f"[OCI] Chunk agregado a queue: {len(audio_bytes)} bytes")
+    #print(f"[OCI] Chunk agregado a queue: {len(audio_bytes)} bytes")
 
 # -----------------------------
 # Detener la sesión
@@ -134,3 +134,4 @@ async def stop_realtime_session():
         client = None
     audio_queue = None
     print("[OCI] Sesión detenida")
+
